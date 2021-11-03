@@ -17,8 +17,8 @@ class AirtableApiClient implements ApiClient
     private $filters = [];
     private $fields = [];
     private $sorts = [];
-    private $offset = false;
-    private $pageSize = 100;
+    private $offset     = false;
+    private $pageSize   = 100;
     private $maxRecords = 100;
 
     public function __construct($base, $table, $access_token, $httpLogFormat = null, Http $client = null, $typecast = false, $delayBetweenRequests = 200000)
