@@ -14,19 +14,27 @@ class AirtableApiClient implements ApiClient
     private $table;
     private $delay;
 
-    private $filters = [];
-    private $fields = [];
-    private $sorts = [];
+    private $filters    = [];
+    private $filtersRaw = '';
+    private $fields     = [];
+    private $sorts      = [];
     private $offset     = false;
     private $pageSize   = 100;
     private $maxRecords = 100;
 
-    public function __construct($base, $table, $access_token, $httpLogFormat = null, Http $client = null, $typecast = false, $delayBetweenRequests = 200000)
-    {
-        $this->base = $base;
-        $this->table = $table;
+    public function __construct(
+        $base,
+        $table,
+        $access_token,
+        $httpLogFormat = null,
+        Http $client = null,
+        $typecast = false,
+        $delayBetweenRequests = 200000
+    ) {
+        $this->base     = $base;
+        $this->table    = $table;
         $this->typecast = $typecast;
-        $this->delay = $delayBetweenRequests;
+        $this->delay    = $delayBetweenRequests;
 
         $this->client = $client ?? $this->buildClient($access_token);
     }
@@ -35,9 +43,9 @@ class AirtableApiClient implements ApiClient
     {
         return Http::withOptions([
             'base_uri' => 'https://api.airtable.com',
-            'headers' => [
+            'headers'  => [
                 'Authorization' => "Bearer {$access_token}",
-                'content-type' => 'application/json',
+                'content-type'  => 'application/json',
             ],
         ]);
     }
@@ -45,6 +53,13 @@ class AirtableApiClient implements ApiClient
     public function addFilter($column, $operation, $value)
     {
         $this->filters[] = "{{$column}}{$operation}\"{$value}\"";
+
+        return $this;
+    }
+
+    public function addFilterRaw($filterString)
+    {
+        $this->filtersRaw = $filterString;
 
         return $this;
     }
@@ -74,6 +89,13 @@ class AirtableApiClient implements ApiClient
         return $this->decodeResponse($this->client->get($url));
     }
 
+    public function getWithOffset($delayBetweenRequestsInMicroseconds, $offset = false)
+    {
+        $this->offset = $offset;
+
+        return $this->get();
+    }
+
     public function getAllPages($delayBetweenRequestsInMicroseconds)
     {
         $records = [];
@@ -100,7 +122,7 @@ class AirtableApiClient implements ApiClient
     {
         $url = $this->getEndpointUrl();
 
-        $params = ['json' => ['fields' => (object) $contents, 'typecast' => $this->typecast]];
+        $params = ['json' => ['fields' => (object)$contents, 'typecast' => $this->typecast]];
 
         return $this->decodeResponse($this->client->post($url, $params));
     }
@@ -109,7 +131,7 @@ class AirtableApiClient implements ApiClient
     {
         $url = $this->getEndpointUrl($id);
 
-        $params = ['json' => ['fields' => (object) $contents, 'typecast' => $this->typecast]];
+        $params = ['json' => ['fields' => (object)$contents, 'typecast' => $this->typecast]];
 
         return $this->decodeResponse($this->client->put($url, $params));
     }
@@ -118,14 +140,14 @@ class AirtableApiClient implements ApiClient
     {
         $url = $this->getEndpointUrl($id);
 
-        $params = ['json' => ['fields' => (object) $contents, 'typecast' => $this->typecast]];
+        $params = ['json' => ['fields' => (object)$contents, 'typecast' => $this->typecast]];
 
         return $this->decodeResponse($this->client->patch($url, $params));
     }
 
     public function massUpdate(string $method, array $data)
     {
-        $url = $this->getEndpointUrl();
+        $url     = $this->getEndpointUrl();
         $records = [];
 
         // Update & Patch request body can include an array of up to 10 record objects
@@ -134,7 +156,7 @@ class AirtableApiClient implements ApiClient
             $params = ['json' => ['records' => $data_chunk, 'typecast' => $this->typecast]];
 
             $response = $this->decodeResponse($this->client->$method($url, $params));
-            $records += $response['records'];
+            $records  += $response['records'];
 
             if (isset($chunks[$key + 1])) {
                 usleep($this->delay);
@@ -153,14 +175,14 @@ class AirtableApiClient implements ApiClient
 
     public function responseToJson($response)
     {
-        $body = (string) $response->getBody();
+        $body = (string)$response->getBody();
 
         return $body;
     }
 
     public function responseToCollection($response)
     {
-        $body = (string) $response->getBody();
+        $body = (string)$response->getBody();
 
         if ($body === '') {
             return collect([]);
@@ -173,7 +195,7 @@ class AirtableApiClient implements ApiClient
 
     public function decodeResponse($response)
     {
-        $body = (string) $response->getBody();
+        $body = (string)$response->getBody();
 
         if ($body === '') {
             return [];
@@ -209,9 +231,9 @@ class AirtableApiClient implements ApiClient
         ], $url);
 
         if ($query_params = $this->getQueryParams()) {
-            $url .= '?'.http_build_query($query_params);
+            $url .= '?' . http_build_query($query_params);
         }
-
+//var_dump($url);exit();
         return $url;
     }
 
@@ -219,8 +241,10 @@ class AirtableApiClient implements ApiClient
     {
         $query_params = [];
 
-        if ($this->filters) {
-            $query_params['filterByFormula'] = 'AND('.implode(',', $this->filters).')';
+        if (!empty($this->filtersRaw)) {
+            $query_params['filterByFormula'] = $this->filtersRaw;
+        } elseif ($this->filters) {
+            $query_params['filterByFormula'] = 'AND(' . implode(',', $this->filters) . ')';
         }
 
         if ($this->fields) {
