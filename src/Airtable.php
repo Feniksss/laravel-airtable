@@ -88,6 +88,21 @@ class Airtable
         return $this->toCollection($this->api->getAllPages($delayBetweenRequestsInMicroseconds));
     }
 
+    /**
+     * @param array $fields
+     * @param false $offset
+     * @param int $delayBetweenRequestsInMicroseconds
+     * @return \Illuminate\Support\Collection|mixed
+     */
+    public function getWithOffset(array $fields = [], $offset = false, $delayBetweenRequestsInMicroseconds = 200000)
+    {
+        if ($fields) {
+            $this->select($fields);
+        }
+
+        return $this->toCollection($this->api->getWithOffset($delayBetweenRequestsInMicroseconds, $offset), true);
+    }
+
     public function table($table)
     {
         $this->api->setTable($table);
@@ -102,6 +117,13 @@ class Airtable
         } else {
             $this->api->addFilter($column, $operator, $value);
         }
+
+        return $this;
+    }
+
+    public function whereFormulaRaw($filterString)
+    {
+        $this->api->addFilterRaw($filterString);
 
         return $this;
     }
@@ -161,8 +183,16 @@ class Airtable
         return $this;
     }
 
-    private function toCollection($object)
+    private function toCollection($object, $withOffset = false)
     {
+        if ($withOffset) {
+            $resultData         = [];
+            $resultData['data'] = isset($object['records']) ? collect($object['records']) : $object;
+            if (isset($object['offset'])) {
+                $resultData['offset'] = $object['offset'];
+            }
+            return $resultData;
+        }
         return isset($object['records']) ? collect($object['records']) : $object;
     }
 }
